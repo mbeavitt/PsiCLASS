@@ -44,7 +44,7 @@ struct _junction
 } ;
 
 char line[LINE_SIZE] ;
-char col[11][LINE_SIZE] ; // The option fields is not needed.
+char *col[11] ; // The option fields is not needed.
 char strand ; // Extract XS field
 char noncanonStrandInfo ;
 //bool secondary ;
@@ -764,6 +764,16 @@ char GetStrandFromStrandedLib(int flag)
 
 int main( int argc, char *argv[] ) 
 {
+
+    for (int i = 0; i < 11; i++) {
+
+        if (i == 9) {
+            continue;
+        } else {
+            col[i] = (char *) malloc(LINE_SIZE);
+        }
+    }
+
 	FILE *fp ;
  	samfile_t *fpsam ;
 	bam1_t *b = NULL ;
@@ -943,6 +953,7 @@ int main( int argc, char *argv[] )
 			if ( b->core.l_qseq < 20 )
 				continue ;
 			
+            col[9] = (char *) malloc(b->core.l_qseq + 1);
 			for ( i = 0 ; i < b->core.l_qseq ; ++i )
 			{
 				int bit = bam1_seqi( bam1_seq( b ), i ) ;
@@ -1128,6 +1139,7 @@ int main( int argc, char *argv[] )
 			printf( "%s", line ) ;
 		}
 		//printf( "hi2 %s\n", col[0] ) ;
+        free(col[9]);
 	}
 	
 	if ( flagPrintJunction )
