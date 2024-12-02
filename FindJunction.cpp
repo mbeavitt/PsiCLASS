@@ -874,28 +874,14 @@ int main( int argc, char *argv[] )
 
 		if ( !fpsam->header )
 		{
-			//samclose( fpsam ) ;
-			//fpsam = samopen( argv[1], "r", 0 ) ;
-			//if ( !fpsam->header )
-			//{
-			useSam = false ;
-			fp = fopen( argv[1], "r" ) ;
-			//}
+            printf( "Could not open file %s\n (not a valid bam file)\n", argv[1] ) ;
+            exit(EXIT_FAILURE);
 		}
 	}
 	else
 	{
-		useSam = false ;
-		fp = NULL ;
-		if ( !strcmp( argv[1], "-" ) )
-			fp = stdin ;
-		else
-			fp = fopen( argv[1], "r" ) ;
-		if ( fp == NULL )
-		{
-			printf( "Could not open file %s\n", argv[1] ) ;
-			return 0 ;
-		}
+        printf( "Could not open file %s\n (not a valid bam file)\n", argv[1] ) ;
+        exit(EXIT_FAILURE);
 	}
 
 	while ( 1 )
@@ -973,60 +959,6 @@ int main( int argc, char *argv[] )
 				secondary = true ;
 			else 
 				secondary = false ;*/
-		}
-		else
-		{
-			char *p ;
-			if ( !fgets( line, LINE_SIZE, fp ) )
-				break ;
-			if ( line[0] == '\0' || line[0] == '@' )
-				continue ;
-			sscanf( line, "%s%s%s%s%s%s%s%s%s%s%s", col[0], col[1], col[2], col[3], col[4], 
-					col[5], col[6], col[7], col[8], col[9],  col[10] ) ;
-					
-			flag = atoi( col[1] ) ;
-			if ( (p = strstr( line, "NH" )) )
-			{
-				int k = 0 ;
-				p += 5 ;
-				while ( *p != ' ' && *p != '\t' && *p != '\0')
-				{
-					k = k * 10 + *p - '0' ;
-					++p ;
-				}
-				/*if ( k >= 2 )
-				{
-					secondary = true ;
-				}
-				else
-					secondary = false ;*/
-				NH = k ;
-			}
-			else
-			{
-				//secondary = false ;
-				NH = 1 ;
-			}
-			if ( ( p = strstr( line, "NM" ) ) || ( p = strstr( line, "nM" ) ) )
-			{
-				int k = 0 ;
-				p += 5 ;
-				while ( *p != ' ' && *p != '\t' && *p != '\0')
-				{
-					k = k * 10 + *p - '0' ;
-					++p ;
-				}
-				editDistance = k ;
-			}
-			else
-				editDistance = 0 ;
-
-			mateStart = atoi( col[7] ) ;
-			/*if ( flag & 0x100 )
-				secondary = true ;
-			else 
-				secondary = false ;*/
-			
 		}
 		samFlag = flag ;
 		for ( i = 0 ; col[5][i] ; ++i )
