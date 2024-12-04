@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -Wall -O0 -Wextra -pedantic
 LINKPATH = -I./samtools-0.1.19 -L./samtools-0.1.19
-LINKFLAGS = -lbam -lz -lm -lpthread
+LINKFLAGS = -lbam -ldl -lz -lm -lpthread
 DEBUGFLAGS = -ggdb3 -fsanitize=address,undefined
 
 all: junc
