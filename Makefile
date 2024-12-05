@@ -6,7 +6,7 @@ LINKFLAGS = -lbam -lz -lm -lpthread
 DEBUG=
 OBJECTS = stats.o subexon-graph.o 
 
-asan=1
+#asan=1
 ifneq ($(asan),)
 	CXXFLAGS+=-fsanitize=address,undefined -ggdb3
 	LINKFLAGS+=-fsanitize=address,undefined -ldl -ggdb3
