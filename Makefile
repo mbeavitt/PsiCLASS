@@ -72,5 +72,10 @@ addXS.o: AddXS.cpp
 add-genename.o: AddGeneName.cpp
 	$(CXX) -c -o $@ $(LINKPATH) $(CXXFLAGS) $< $(LINKFLAGS)
 
+test-md5: all
+	./psiclass -b example/s1.bam >/dev/null && md5sum ./psiclass_vote.gtf
+	./psiclass -b example/s2.bam >/dev/null && md5sum ./psiclass_vote.gtf
+	./psiclass -b example/l1.bam >/dev/null && md5sum ./psiclass_vote.gtf
+
 clean:
 	rm -f *.o *.gch subexon-info combine-subexons trust-splice vote-transcripts junc grader add-genename addXS
