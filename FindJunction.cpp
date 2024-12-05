@@ -777,7 +777,6 @@ int main( int argc, char *argv[] )
 	FILE *fp ;
  	samfile_t *fpsam ;
 	bam1_t *b = NULL ;
-	bool useSam = true ;
 
  	int i, len ;
  	int startLocation ; 
@@ -887,79 +886,77 @@ int main( int argc, char *argv[] )
 	while ( 1 )
 	{
 		int flag = 0 ;
-		if ( useSam )
-		{
-			if ( b )
-				bam_destroy1( b ) ;
-			b = bam_init1() ;
-			if ( samread( fpsam, b ) <= 0 )
-				break ;
-			if ( b->core.tid >= 0 )
-				strcpy( col[2], fpsam->header->target_name[b->core.tid] ) ;
-			else
-				continue ;
-				//strcpy( col[2], "-1" ) ;
-			cigar2string( &(b->core), bam1_cigar( b ), col[5] ) ;
-			strcpy( col[0], bam1_qname( b ) ) ;	
-			flag = b->core.flag ;	
-			if ( bam_aux_get( b, "NH" ) )
-			{	
-				/*if ( bam_aux2i( bam_aux_get(b, "NH" ) ) >= 2 )
-				{
-					secondary = true ;
-				}
-				else
-					secondary = false ;*/
+        if ( b )
+            bam_destroy1( b ) ;
+        b = bam_init1() ;
+        if ( samread( fpsam, b ) <= 0 )
+            break ;
+        if ( b->core.tid >= 0 )
+            strcpy( col[2], fpsam->header->target_name[b->core.tid] ) ;
+        else
+            continue ;
+            //strcpy( col[2], "-1" ) ;
+        cigar2string( &(b->core), bam1_cigar( b ), col[5] ) ;
+        strcpy( col[0], bam1_qname( b ) ) ;	
+        flag = b->core.flag ;	
+        if ( bam_aux_get( b, "NH" ) )
+        {	
+            /*if ( bam_aux2i( bam_aux_get(b, "NH" ) ) >= 2 )
+            {
+                secondary = true ;
+            }
+            else
+                secondary = false ;*/
 
-				NH = bam_aux2i( bam_aux_get( b, "NH" ) ) ;
-			}
-			else
-			{
-				//secondary = false ;
-				NH = 1 ;
-			}
+            NH = bam_aux2i( bam_aux_get( b, "NH" ) ) ;
+        }
+        else
+        {
+            //secondary = false ;
+            NH = 1 ;
+        }
 
-			if ( bam_aux_get( b, "NM" ) )
-			{
-				editDistance = bam_aux2i( bam_aux_get( b, "NM" ) ) ;
-			}
-			else if ( bam_aux_get( b, "nM" ) )
-			{
-				editDistance = bam_aux2i( bam_aux_get( b, "nM" ) ) ;
-			}
-			else
-				editDistance = 0 ;
+        if ( bam_aux_get( b, "NM" ) )
+        {
+            editDistance = bam_aux2i( bam_aux_get( b, "NM" ) ) ;
+        }
+        else if ( bam_aux_get( b, "nM" ) )
+        {
+            editDistance = bam_aux2i( bam_aux_get( b, "nM" ) ) ;
+        }
+        else
+            editDistance = 0 ;
 
-			mateStart = b->core.mpos + 1 ;
-			if ( b->core.mtid == b->core.tid )
-				col[6][0] = '=' ;
-			else
-				col[6][0] = '*' ;		
+        mateStart = b->core.mpos + 1 ;
+        if ( b->core.mtid == b->core.tid )
+            col[6][0] = '=' ;
+        else
+            col[6][0] = '*' ;		
 
-			if ( b->core.l_qseq < 20 )
-				continue ;
-			
-            col[9] = (char *) malloc(b->core.l_qseq + 1);
-			for ( i = 0 ; i < b->core.l_qseq ; ++i )
-			{
-				int bit = bam1_seqi( bam1_seq( b ), i ) ;
-				switch ( bit )
-				{
-					case 1: col[9][i] = 'A' ; break ;
-					case 2: col[9][i] = 'C' ; break ;
-					case 4: col[9][i] = 'G' ; break ;
-					case 8: col[9][i] = 'T' ; break ;
-					case 15: col[9][i] = 'N' ; break ;
-					default: col[9][i] = 'A' ; break ;
-				}	
-			}
-			col[9][i] = '\0' ;
+        if ( b->core.l_qseq < 20 )
+            continue ;
+        
+        col[9] = (char *) malloc(b->core.l_qseq + 1);
+        for ( i = 0 ; i < b->core.l_qseq ; ++i )
+        {
+            int bit = bam1_seqi( bam1_seq( b ), i ) ;
+            switch ( bit )
+            {
+                case 1: col[9][i] = 'A' ; break ;
+                case 2: col[9][i] = 'C' ; break ;
+                case 4: col[9][i] = 'G' ; break ;
+                case 8: col[9][i] = 'T' ; break ;
+                case 15: col[9][i] = 'N' ; break ;
+                default: col[9][i] = 'A' ; break ;
+            }	
+        }
+        col[9][i] = '\0' ;
 
-			/*if ( flag & 0x100 )
-				secondary = true ;
-			else 
-				secondary = false ;*/
-		}
+        /*if ( flag & 0x100 )
+            secondary = true ;
+        else 
+            secondary = false ;*/
+
 		samFlag = flag ;
 		for ( i = 0 ; col[5][i] ; ++i )
 			if ( col[5][i] == 'N' )
@@ -980,57 +977,29 @@ int main( int argc, char *argv[] )
 			}
 		}
 
-		if ( useSam )
-		{
-			if ( bam_aux_get( b, "XS" ) )
-			{
-				strand = bam_aux2A( bam_aux_get( b, "XS" ) ) ;
-				if ( bam_aux_get( b, "YS" ) )
-				{
-					noncanonStrandInfo = bam_aux2i( bam_aux_get( b, "YS" ) ) ;
-				}
-				else
-				{
-					noncanonStrandInfo = -1 ;
-				}
-			}
-			else if ( strandedLib != 0 ) 
-			{
-				strand = GetStrandFromStrandedLib(flag) ;
-				noncanonStrandInfo = -1 ;
-			}
-			else
-			{
-				strand = '?' ;
-				noncanonStrandInfo = -1 ;
-			}
-			startLocation = b->core.pos + 1 ;
-		}
-		else
-		{
-			if ( strstr( line, "XS:A:-" ) ) // on negative strand
-				strand = '-' ;
-			else if ( strstr( line, "XS:A:+" ) )
-				strand = '+' ;
-			else if ( strandedLib != 0) 
-			{
-				strand = GetStrandFromStrandedLib(flag) ;
-				noncanonStrandInfo = -1 ;
-			}
-			else
-			{
-				strand = '?' ;
-				char *p = strstr( line, "YS:i:" ) ;
-				if ( p != NULL )
-				{
-					p += 5 ;
-					noncanonStrandInfo = atoi( p ) ;
-				}
-				else
-					noncanonStrandInfo = -1 ;
-			}
-			startLocation = atoi( col[3] ) ;  
-		}
+        if ( bam_aux_get( b, "XS" ) )
+        {
+            strand = bam_aux2A( bam_aux_get( b, "XS" ) ) ;
+            if ( bam_aux_get( b, "YS" ) )
+            {
+                noncanonStrandInfo = bam_aux2i( bam_aux_get( b, "YS" ) ) ;
+            }
+            else
+            {
+                noncanonStrandInfo = -1 ;
+            }
+        }
+        else if ( strandedLib != 0 ) 
+        {
+            strand = GetStrandFromStrandedLib(flag) ;
+            noncanonStrandInfo = -1 ;
+        }
+        else
+        {
+            strand = '?' ;
+            noncanonStrandInfo = -1 ;
+        }
+        startLocation = b->core.pos + 1 ;
 		
 		// Found the junctions from the read.
 		if ( strcmp( prevChrome, col[2] ) )
