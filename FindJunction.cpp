@@ -774,7 +774,6 @@ int main( int argc, char *argv[] )
         }
     }
 
-	FILE *fp ;
  	samfile_t *fpsam ;
 	bam1_t *b = NULL ;
 
