@@ -767,7 +767,7 @@ int main( int argc, char *argv[] )
 
     for (int i = 0; i < 11; i++) {
 
-        if (i == 9) {
+        if ((i == 9) || (i == 0)) {
             continue;
         } else {
             col[i] = (char *) malloc(LINE_SIZE);
@@ -897,7 +897,15 @@ int main( int argc, char *argv[] )
             continue ;
             //strcpy( col[2], "-1" ) ;
         cigar2string( &(b->core), bam1_cigar( b ), col[5] ) ;
-        strcpy( col[0], bam1_qname( b ) ) ;	
+
+        // Dynamically allocating and assigning query name to col[0]
+        col[0] = strdup(bam1_qname( b )) ;
+
+        if (col[0] == NULL) {
+            printf("Out of memory!\n") ;
+            exit(EXIT_FAILURE) ;
+        }
+
         flag = b->core.flag ;	
         if ( bam_aux_get( b, "NH" ) )
         {	
