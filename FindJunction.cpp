@@ -767,7 +767,7 @@ int main( int argc, char *argv[] )
 
     for (int i = 0; i < 11; i++) {
 
-        if ((i == 9) || (i == 0)) {
+        if ((i == 9) || (i == 0) || (i == 2)) {
             continue;
         } else {
             col[i] = (char *) malloc(LINE_SIZE);
@@ -891,7 +891,7 @@ int main( int argc, char *argv[] )
         if ( samread( fpsam, b ) <= 0 )
             break ;
         if ( b->core.tid >= 0 )
-            strcpy( col[2], fpsam->header->target_name[b->core.tid] ) ;
+            col[2] = strdup( fpsam->header->target_name[b->core.tid] ) ;
         else
             continue ;
             //strcpy( col[2], "-1" ) ;
@@ -1048,6 +1048,8 @@ int main( int argc, char *argv[] )
 		}
 		//printf( "hi2 %s\n", col[0] ) ;
         free(col[9]);
+        free(col[0]);
+        free(col[2]);
 	}
 	
 	if ( flagPrintJunction )
