@@ -783,13 +783,11 @@ char GetStrandFromStrandedLib(int flag)
 int main( int argc, char *argv[] ) 
 {
 
-    for (int i = 0; i < 11; i++) {
-
-        if ((i == 9) || (i == 0) || (i == 2) || (i == 5)) {
-            continue;
-        } else {
-            col[i] = (char *) malloc(LINE_SIZE);
-        }
+    // this will only ever contain '*' or '='
+    col[6] = (char *) malloc(2);
+    if (col[6] == NULL) {
+        printf("Out of memory!\n");
+        exit(EXIT_FAILURE);
     }
 
  	samfile_t *fpsam ;
