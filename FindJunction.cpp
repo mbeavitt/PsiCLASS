@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "sam.h"
 
@@ -724,12 +725,29 @@ bool CompareJunctions( int startLocation, char *cigar )
 		return false ;
 }
 
-void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char *out_cigar )
+void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char **out_cigar )
 {
 	int k, op, l ;
 	char opcode ;
+    int string_length = 0;
 
-	*out_cigar = '\0' ;
+    for (k = 0 ; k < c->n_cigar ; ++k )
+    {
+        l = in_cigar[k] >> BAM_CIGAR_SHIFT ;
+        string_length += (l == 0) ? 1 : (int)log10(abs(l)) + 1;
+        string_length++;
+    }
+
+    string_length++;
+
+    *out_cigar = (char *) malloc(string_length + 1);
+
+    if (*out_cigar == NULL) {
+        printf("Out of memory!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    *(*out_cigar) = '\0';
 	for ( k = 0 ; k < c->n_cigar ; ++k )
 	{
 		op = in_cigar[k] & BAM_CIGAR_MASK ;
@@ -744,7 +762,7 @@ void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char *out_cigar )
 			case BAM_CHARD_CLIP: opcode = 'H' ; break ;
 			case BAM_CPAD: opcode = 'P' ; break ;
 		}
-		sprintf( out_cigar + strlen( out_cigar ), "%d%c", l, opcode ) ;
+		sprintf( *out_cigar + strlen( *out_cigar ), "%d%c", l, opcode ) ;
 	}
 }
 
@@ -767,7 +785,7 @@ int main( int argc, char *argv[] )
 
     for (int i = 0; i < 11; i++) {
 
-        if ((i == 9) || (i == 0) || (i == 2)) {
+        if ((i == 9) || (i == 0) || (i == 2) || (i == 5)) {
             continue;
         } else {
             col[i] = (char *) malloc(LINE_SIZE);
@@ -895,7 +913,8 @@ int main( int argc, char *argv[] )
         else
             continue ;
             //strcpy( col[2], "-1" ) ;
-        cigar2string( &(b->core), bam1_cigar( b ), col[5] ) ;
+
+        cigar2string( &(b->core), bam1_cigar( b ), &col[5] ) ;
 
         // Dynamically allocating and assigning query name to col[0]
         col[0] = strdup(bam1_qname( b )) ;
@@ -1050,6 +1069,7 @@ int main( int argc, char *argv[] )
         free(col[9]);
         free(col[0]);
         free(col[2]);
+        free(col[5]);
 	}
 	
 	if ( flagPrintJunction )
