@@ -1113,6 +1113,7 @@ int main( int argc, char *argv[] )
 	
 	//fprintf( stderr, "The number of junctions: %d\n", junctionCnt ) ;
     samclose(fpsam);
+    bam_destroy1(b);
 	return 0 ;
 }
 
