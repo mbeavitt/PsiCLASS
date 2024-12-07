@@ -1014,8 +1014,10 @@ int main( int argc, char *argv[] )
 			if ( aln.cigar_string[i] == 'N' )
 				break ;
 
-		if ( !aln.cigar_string[i] )
+		if ( !aln.cigar_string[i] ) {
+            free_alignment(&aln) ;
 			continue ;
+        }
 		
 		// remove .1, .2 or /1, /2 suffix
 		if ( hasMateReadIdSuffix )
@@ -1110,6 +1112,7 @@ int main( int argc, char *argv[] )
 	}	
 	
 	//fprintf( stderr, "The number of junctions: %d\n", junctionCnt ) ;
+    samclose(fpsam);
 	return 0 ;
 }
 
