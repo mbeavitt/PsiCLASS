@@ -909,7 +909,7 @@ int main( int argc, char *argv[] )
 	}
 
 	len = strlen( argv[1] ) ;
-	if ( argv[1][len-3] == 'b' || argv[1][len-3] == 'B' )
+	if ( argv[1][len-3] == 'b' || argv[1][len-3] == 'B' ) // is file .bam?
 	{	
 		if ( !( fpsam = samopen( argv[1], "rb", 0 ) ) )
 			return 0 ;
@@ -920,10 +920,16 @@ int main( int argc, char *argv[] )
             exit(EXIT_FAILURE);
 		}
 	}
-	else
+	else // assume .sam
 	{
-        printf( "Could not open file %s\n (not a valid bam file)\n", argv[1] ) ;
-        exit(EXIT_FAILURE);
+		if ( !( fpsam = samopen( argv[1], "r", 0 ) ) )
+			return 0 ;
+
+		if ( !fpsam->header )
+		{
+            printf( "Could not open file %s\n (not a valid sam file)\n", argv[1] ) ;
+            exit(EXIT_FAILURE);
+		}
 	}
 
 	while ( 1 )
