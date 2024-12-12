@@ -524,7 +524,11 @@ bool CompareJunctions( int startLocation, char *cigar )
 	int currentLocation = startLocation ; // Current location on the reference genome
 	int i, j ;
 	int num ;
-	int newJuncCnt = 0 ; // The # of junctions in the read, and the # of new junctions among them.
+	int newJuncCnt = 0 ; // The # of junctions in the read, and the # of new junctions among them
+
+    int n_chunks; // counter for cigar chunks in complexity filter loop
+    float cumulative_complexity; // a rolling count of complexity calculations
+    float weighted_average_complexity; // the final average complexity across all chunks
 	
 	int ccnt = 0 ; // cigarSeg cnt
 
@@ -582,6 +586,8 @@ bool CompareJunctions( int startLocation, char *cigar )
 			int count[5] = { 0, 0, 0, 0, 0 } ;
 
 			int pos = 0 ;
+            n_chunks = 0;
+            cumulative_complexity = 0.0;
 			for ( i = 0 ; i < ccnt ; ++i )
 			{
 				switch ( cigarSeg[i].type )
@@ -605,9 +611,10 @@ bool CompareJunctions( int startLocation, char *cigar )
 									max = count[j] ;
 								sum += count[j] ;
 							}
-							if ( max > 0.8 * sum ) {
-								validRead = false ;
-							}
+
+                            // cumulative complexity, weighted by sum
+                            cumulative_complexity += ((float) max / (float) sum) * (float) sum;
+                            n_chunks+= sum;
 							count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
 						} break ;
 					case 'H':
@@ -626,11 +633,16 @@ bool CompareJunctions( int startLocation, char *cigar )
 				}
 				sum += count[j] ;
 			}
-            if ( max > 0.8 * sum ) {
+            cumulative_complexity += ((float) max / (float) sum) * (float) sum;
+            n_chunks+= sum;
+            weighted_average_complexity = cumulative_complexity / (float) n_chunks;
+
+            if ( weighted_average_complexity > 0.50 ) {
                 fprintf(stderr, "!!!READ FILTERED!!!\n");
                 fprintf(stderr, "%s\n", cigar);
                 fprintf(stderr, "%s\n", aln.seq);
-                fprintf(stderr, "Counts: {%d, %d, %d, %d, %d}\n\n", count[0], count[1], count[2], count[3], count[4]);
+                fprintf(stderr, "Average complexity: %.2f\n", weighted_average_complexity);
+                fprintf(stderr, "\n");
 				validRead = false ;
             }
 			/*	count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
