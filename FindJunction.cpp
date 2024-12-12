@@ -617,8 +617,13 @@ bool CompareJunctions( int startLocation, char *cigar )
 				}
 				sum += count[j] ;
 			}
-			if ( max > 0.8 * sum )
+            if ( max > 0.8 * sum ) {
+                fprintf(stderr, "!!!READ FILTERED!!!\n");
+                fprintf(stderr, "%s\n", cigar);
+                fprintf(stderr, "%s\n", aln.seq);
+                fprintf(stderr, "Counts: {%d, %d, %d, %d, %d}\n\n", count[0], count[1], count[2], count[3], count[4]);
 				validRead = false ;
+            }
 			/*	count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
 
 
