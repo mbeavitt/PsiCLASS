@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS= -Wall -O0 -ggdb3 -Wextra -pedantic #-g #-std=c++11 #-Wall #-g
+CXXFLAGS= -Wall -O0 -Wextra -pedantic -ggdb3  #-g #-std=c++11 #-Wall #-g
 #CXXFLAGS= -Wall -g #-std=c++11 #-Wall #-g
 LINKPATH= -I./samtools-0.1.19 -L./samtools-0.1.19
 LINKFLAGS = -lbam -lz -lm -lpthread 
@@ -8,8 +8,8 @@ OBJECTS = stats.o subexon-graph.o
 
 #asan=1
 ifneq ($(asan),)
-	CXXFLAGS+=-fsanitize=address -g
-	LINKFLAGS+=-fsanitize=address -ldl -g
+	CXXFLAGS+=-fsanitize=address,undefined -ggdb3
+	LINKFLAGS+=-fsanitize=address,undefined -ldl -ggdb3
 endif
 
 all: subexon-info combine-subexons classes vote-transcripts junc grader trust-splice add-genename addXS
@@ -71,6 +71,11 @@ addXS.o: AddXS.cpp
 	$(CXX) -c -o $@ $(LINKPATH) $(CXXFLAGS) $< $(LINKFLAGS)
 add-genename.o: AddGeneName.cpp
 	$(CXX) -c -o $@ $(LINKPATH) $(CXXFLAGS) $< $(LINKFLAGS)
+
+test-md5: all
+	./psiclass -b example/s1.bam >/dev/null && md5sum ./psiclass_vote.gtf
+	./psiclass -b example/s2.bam >/dev/null && md5sum ./psiclass_vote.gtf
+	./psiclass -b example/l1.bam >/dev/null && md5sum ./psiclass_vote.gtf
 
 clean:
 	rm -f *.o *.gch subexon-info combine-subexons trust-splice vote-transcripts junc grader add-genename addXS

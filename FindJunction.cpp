@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "sam.h"
 
@@ -43,8 +44,16 @@ struct _junction
 	struct _readTree head ;
 } ;
 
+// initialising alignment struct 'aln' - contains only the necessary fields for this tool
+struct alignment {
+    char *qname ;
+    char *rname ;
+    char *cigar_string ;
+    char rnext[2] ;
+    char *seq ;
+} aln;
+
 char line[LINE_SIZE] ;
-char col[11][LINE_SIZE] ; // The option fields is not needed.
 char strand ; // Extract XS field
 signed char noncanonStrandInfo ;
 //bool secondary ;
@@ -91,6 +100,33 @@ void PrintHelp()
 	    "\t-y: If the bits from YS field of bam matches the argument, we filter the alignment (default: 4).\n"
 			"\t--stranded un/rf/fr: stranded library fr-firststrand/secondstrand (default: not set).\n"
 	      ) ;
+}
+
+// frees stack allocated 'alignment' struct fields
+void free_alignment(struct alignment *aln) 
+{
+    if (aln == NULL) return;
+
+    // free the dynamically allocated fields
+    if (aln->qname != NULL) {
+        free(aln->qname);
+        aln->qname = NULL;
+    }
+
+    if (aln->rname != NULL) {
+        free(aln->rname);
+        aln->rname = NULL;
+    }
+
+    if (aln->cigar_string != NULL) {
+        free(aln->cigar_string);
+        aln->cigar_string = NULL;
+    }
+
+    if (aln->seq != NULL) {
+        free(aln->seq);
+        aln->seq = NULL;
+    }
 }
 
 void GetJunctionInfo( struct _junction &junc, struct _readTree *p )
@@ -372,7 +408,7 @@ void InsertQueue( int start, int end, int l, int r )
 	junctionQueue[i].leftAnchor = l ;
 	junctionQueue[i].rightAnchor = r ;
 	
-	strcpy( junctionQueue[i].head.id, col[0] ) ;
+	strcpy( junctionQueue[i].head.id, aln.qname ) ;
 	junctionQueue[i].head.valid = validRead ;
 	junctionQueue[i].head.leftAnchor = l ;
 	junctionQueue[i].head.rightAnchor = r ;
@@ -403,7 +439,7 @@ bool SearchQueue( int start, int end, int prune, int l, int r )
 			( junctionQueue[i].start > start && junctionQueue[i].end == end ) )
 		{
 			// This alignment is false ;
-			rt = GetReadTreeNode( &junctionQueue[i].head, col[0] ) ;
+			rt = GetReadTreeNode( &junctionQueue[i].head, aln.qname ) ;
 			// the commented out logic because it is handled by contradicted reads
 			if ( rt != NULL ) //&& ( rt->flag & 0x40 ) != ( samFlag & 0x40 ) )
 			{
@@ -426,7 +462,7 @@ bool SearchQueue( int start, int end, int prune, int l, int r )
 			( junctionQueue[i].start < start && junctionQueue[i].end == end ) )
 		{
 			// This other alignment is false ;
-			rt = GetReadTreeNode( &junctionQueue[i].head, col[0] ) ;
+			rt = GetReadTreeNode( &junctionQueue[i].head, aln.qname ) ;
 			//if ( rt != NULL )
 			if ( rt != NULL ) //&& ( rt->flag & 0x40 ) != ( samFlag & 0x40 ) )
 			{
@@ -459,14 +495,14 @@ bool SearchQueue( int start, int end, int prune, int l, int r )
 			{
 				junctionQueue[i].strand = strand ;
 			}
-			InsertReadTree( &junctionQueue[i].head, col[0], l, r ) ; 
+			InsertReadTree( &junctionQueue[i].head, aln.qname, l, r ) ; 
 			return true ;
 		}
 		
 		if ( junctionQueue[i].end < prune && i == qHead )
 		{
 			// pop
-			PrintJunction( col[2], junctionQueue[i] ) ;
+			PrintJunction( aln.rname, junctionQueue[i] ) ;
 			ClearReadTree( junctionQueue[i].head.left ) ;
 			ClearReadTree( junctionQueue[i].head.right ) ;
 			++qHead ;
@@ -490,12 +526,22 @@ bool CompareJunctions( int startLocation, char *cigar )
 	int num ;
 	int newJuncCnt = 0 ; // The # of junctions in the read, and the # of new junctions among them.
 	
-	struct _cigarSeg cigarSeg[2000] ; // A segment of the cigar.
 	int ccnt = 0 ; // cigarSeg cnt
+
+    // iterating through to get length
+    for (i = 0; cigar[i]; ++i) {
+        if (!(cigar[i] >= '0' && cigar[i] <= '9' )) {
+            ccnt++;
+        }
+    }
+
+    struct _cigarSeg* cigarSeg = (struct _cigarSeg*) malloc(ccnt * sizeof(struct _cigarSeg));
 
 	j = 0 ;
 	num = 0 ;
 	validRead = true ;
+
+    ccnt = 0; // resetting to zero for copying over cigar
 
 	for ( i = 0 ; cigar[i] ; ++i )
 	{
@@ -531,7 +577,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 				softStart = cigarSeg[0].len ;
 			if ( cigarSeg[ ccnt - 1 ].type == 'S' )
 				softEnd = cigarSeg[ ccnt - 1 ].len ;
-			int readLen = strlen( col[9] ) ;
+			int readLen = strlen( col[9] ) ; // will need to change col[9] to aln.seq
 			*/
 			int count[5] = { 0, 0, 0, 0, 0 } ;
 
@@ -546,7 +592,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 					case 'I':
 						{
 							for ( j = 0 ; j < cigarSeg[i].len ; ++j )
-								++count[ (unsigned char) nucToNum[  col[9][pos + j] - 'A' ] ] ;
+								++count[ (unsigned char) nucToNum[  aln.seq[pos + j] - 'A' ] ] ;
 							pos += j ;
 						} break ;
 					case 'N':
@@ -580,14 +626,19 @@ bool CompareJunctions( int startLocation, char *cigar )
 				}
 				sum += count[j] ;
 			}
-			if ( max > 0.8 * sum )
+            if ( max > 0.8 * sum ) {
+                fprintf(stderr, "!!!READ FILTERED!!!\n");
+                fprintf(stderr, "%s\n", cigar);
+                fprintf(stderr, "%s\n", aln.seq);
+                fprintf(stderr, "Counts: {%d, %d, %d, %d, %d}\n\n", count[0], count[1], count[2], count[3], count[4]);
 				validRead = false ;
+            }
 			/*	count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
 
 
 			for ( i = softStart + 1 ; i < readLen - softEnd ; ++i )
 			  {
-			  switch ( col[9][i] )
+			  switch ( col[9][i] ) // will need to change to aln.seq
 			  {
 			  case 'A': ++count[0] ; break ;
 			  case 'C': ++count[1] ; break ;
@@ -606,7 +657,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 	}
 
 	// Test whether contradict with mate pair
-	if ( col[6][0] == '=' )
+	if ( aln.rnext[0] == '=' )
 	{
 		currentLocation = startLocation ;
 		for ( i = 0 ; i < ccnt ; ++i )
@@ -625,7 +676,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 				}*/
 					// ignore this read
 					//return false ;
-					InsertContradictedReads( contradictedReads, col[0], mateStart ) ;
+					InsertContradictedReads( contradictedReads, aln.qname, mateStart ) ;
 					validRead = false ;
 					break ;
 				}
@@ -639,7 +690,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 		{
 			if ( mateStart < junctionQueue[i].start && junctionQueue[i].start <= startLocation 
 				&& startLocation <= junctionQueue[i].end 
-				&& SearchContradictedReads( contradictedReads, col[0], startLocation ) )
+				&& SearchContradictedReads( contradictedReads, aln.qname, startLocation ) )
 			{
 				validRead = false ;
 				break ;
@@ -705,6 +756,7 @@ bool CompareJunctions( int startLocation, char *cigar )
 			{
 				++newJuncCnt ;
 				//if ( flagPrintJunction )
+                // NOTE: col replaced with alignment struct 
 				//	printf( "%s %d %d\n", col[2], currentLocation - 2, currentLocation + len - 1 ) ;
 			}
 			currentLocation += num ;
@@ -724,12 +776,29 @@ bool CompareJunctions( int startLocation, char *cigar )
 		return false ;
 }
 
-void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char *out_cigar )
+void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char **out_cigar )
 {
 	int k, op, l ;
 	char opcode ;
+    int string_length = 0;
 
-	*out_cigar = '\0' ;
+    for (k = 0 ; k < c->n_cigar ; ++k )
+    {
+        l = in_cigar[k] >> BAM_CIGAR_SHIFT ;
+        string_length += (l == 0) ? 1 : (int)log10(abs(l)) + 1;
+        string_length++;
+    }
+
+    string_length++;
+
+    *out_cigar = (char *) malloc(string_length + 1);
+
+    if (*out_cigar == NULL) {
+        printf("Out of memory!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    *(*out_cigar) = '\0';
 	for ( k = 0 ; k < c->n_cigar ; ++k )
 	{
 		op = in_cigar[k] & BAM_CIGAR_MASK ;
@@ -744,7 +813,7 @@ void cigar2string( bam1_core_t *c, uint32_t *in_cigar, char *out_cigar )
 			case BAM_CHARD_CLIP: opcode = 'H' ; break ;
 			case BAM_CPAD: opcode = 'P' ; break ;
 		}
-		sprintf( out_cigar + strlen( out_cigar ), "%d%c", l, opcode ) ;
+		sprintf( *out_cigar + strlen( *out_cigar ), "%d%c", l, opcode ) ;
 	}
 }
 
@@ -764,10 +833,8 @@ char GetStrandFromStrandedLib(int flag)
 
 int main( int argc, char *argv[] ) 
 {
-	FILE *fp ;
  	samfile_t *fpsam ;
 	bam1_t *b = NULL ;
-	bool useSam = true ;
 
  	int i, len ;
  	int startLocation ; 
@@ -864,171 +931,113 @@ int main( int argc, char *argv[] )
 
 		if ( !fpsam->header )
 		{
-			//samclose( fpsam ) ;
-			//fpsam = samopen( argv[1], "r", 0 ) ;
-			//if ( !fpsam->header )
-			//{
-			useSam = false ;
-			fp = fopen( argv[1], "r" ) ;
-			//}
+            printf( "Could not open file %s\n (not a valid bam file)\n", argv[1] ) ;
+            exit(EXIT_FAILURE);
 		}
 	}
 	else
 	{
-		useSam = false ;
-		fp = NULL ;
-		if ( !strcmp( argv[1], "-" ) )
-			fp = stdin ;
-		else
-			fp = fopen( argv[1], "r" ) ;
-		if ( fp == NULL )
-		{
-			printf( "Could not open file %s\n", argv[1] ) ;
-			return 0 ;
-		}
+        printf( "Could not open file %s\n (not a valid bam file)\n", argv[1] ) ;
+        exit(EXIT_FAILURE);
 	}
 
 	while ( 1 )
 	{
 		int flag = 0 ;
-		if ( useSam )
-		{
-			if ( b )
-				bam_destroy1( b ) ;
-			b = bam_init1() ;
-			if ( samread( fpsam, b ) <= 0 )
-				break ;
-			if ( b->core.tid >= 0 )
-				strcpy( col[2], fpsam->header->target_name[b->core.tid] ) ;
-			else
-				continue ;
-				//strcpy( col[2], "-1" ) ;
-			cigar2string( &(b->core), bam1_cigar( b ), col[5] ) ;
-			strcpy( col[0], bam1_qname( b ) ) ;	
-			flag = b->core.flag ;	
-			if ( bam_aux_get( b, "NH" ) )
-			{	
-				/*if ( bam_aux2i( bam_aux_get(b, "NH" ) ) >= 2 )
-				{
-					secondary = true ;
-				}
-				else
-					secondary = false ;*/
+        if ( b )
+            bam_destroy1( b ) ;
+        b = bam_init1() ;
+        if ( samread( fpsam, b ) <= 0 )
+            break ;
+        if ( b->core.tid >= 0 )
+            aln.rname = strdup( fpsam->header->target_name[b->core.tid] ) ;
+        else
+            continue ;
+            //strcpy( col[2], "-1" ) ;
 
-				NH = bam_aux2i( bam_aux_get( b, "NH" ) ) ;
-			}
-			else
-			{
-				//secondary = false ;
-				NH = 1 ;
-			}
+        cigar2string( &(b->core), bam1_cigar( b ), &aln.cigar_string ) ;
 
-			if ( bam_aux_get( b, "NM" ) )
-			{
-				editDistance = bam_aux2i( bam_aux_get( b, "NM" ) ) ;
-			}
-			else if ( bam_aux_get( b, "nM" ) )
-			{
-				editDistance = bam_aux2i( bam_aux_get( b, "nM" ) ) ;
-			}
-			else
-				editDistance = 0 ;
+        // Dynamically allocating and assigning query name
+        aln.qname = strdup(bam1_qname( b )) ;
 
-			mateStart = b->core.mpos + 1 ;
-			if ( b->core.mtid == b->core.tid )
-				col[6][0] = '=' ;
-			else
-				col[6][0] = '*' ;		
+        if (aln.qname == NULL) {
+            printf("Out of memory!\n") ;
+            exit(EXIT_FAILURE) ;
+        }
 
-			if ( b->core.l_qseq < 20 )
-				continue ;
-			
-			for ( i = 0 ; i < b->core.l_qseq ; ++i )
-			{
-				int bit = bam1_seqi( bam1_seq( b ), i ) ;
-				switch ( bit )
-				{
-					case 1: col[9][i] = 'A' ; break ;
-					case 2: col[9][i] = 'C' ; break ;
-					case 4: col[9][i] = 'G' ; break ;
-					case 8: col[9][i] = 'T' ; break ;
-					case 15: col[9][i] = 'N' ; break ;
-					default: col[9][i] = 'A' ; break ;
-				}	
-			}
-			col[9][i] = '\0' ;
+        flag = b->core.flag ;	
+        if ( bam_aux_get( b, "NH" ) )
+        {	
+            /*if ( bam_aux2i( bam_aux_get(b, "NH" ) ) >= 2 )
+            {
+                secondary = true ;
+            }
+            else
+                secondary = false ;*/
 
-			/*if ( flag & 0x100 )
-				secondary = true ;
-			else 
-				secondary = false ;*/
-		}
-		else
-		{
-			char *p ;
-			if ( !fgets( line, LINE_SIZE, fp ) )
-				break ;
-			if ( line[0] == '\0' || line[0] == '@' )
-				continue ;
-			sscanf( line, "%s%s%s%s%s%s%s%s%s%s%s", col[0], col[1], col[2], col[3], col[4], 
-					col[5], col[6], col[7], col[8], col[9],  col[10] ) ;
-					
-			flag = atoi( col[1] ) ;
-			if ( (p = strstr( line, "NH" )) )
-			{
-				int k = 0 ;
-				p += 5 ;
-				while ( *p != ' ' && *p != '\t' && *p != '\0')
-				{
-					k = k * 10 + *p - '0' ;
-					++p ;
-				}
-				/*if ( k >= 2 )
-				{
-					secondary = true ;
-				}
-				else
-					secondary = false ;*/
-				NH = k ;
-			}
-			else
-			{
-				//secondary = false ;
-				NH = 1 ;
-			}
-			if ( ( p = strstr( line, "NM" ) ) || ( p = strstr( line, "nM" ) ) )
-			{
-				int k = 0 ;
-				p += 5 ;
-				while ( *p != ' ' && *p != '\t' && *p != '\0')
-				{
-					k = k * 10 + *p - '0' ;
-					++p ;
-				}
-				editDistance = k ;
-			}
-			else
-				editDistance = 0 ;
+            NH = bam_aux2i( bam_aux_get( b, "NH" ) ) ;
+        }
+        else
+        {
+            //secondary = false ;
+            NH = 1 ;
+        }
 
-			mateStart = atoi( col[7] ) ;
-			/*if ( flag & 0x100 )
-				secondary = true ;
-			else 
-				secondary = false ;*/
-			
-		}
+        if ( bam_aux_get( b, "NM" ) )
+        {
+            editDistance = bam_aux2i( bam_aux_get( b, "NM" ) ) ;
+        }
+        else if ( bam_aux_get( b, "nM" ) )
+        {
+            editDistance = bam_aux2i( bam_aux_get( b, "nM" ) ) ;
+        }
+        else
+            editDistance = 0 ;
+
+        mateStart = b->core.mpos + 1 ;
+        if ( b->core.mtid == b->core.tid )
+            aln.rnext[0] = '=' ;
+        else
+            aln.rnext[0] = '*' ;		
+
+        if ( b->core.l_qseq < 20 )
+            continue ;
+        
+        aln.seq = (char *) malloc(b->core.l_qseq + 1);
+        for ( i = 0 ; i < b->core.l_qseq ; ++i )
+        {
+            int bit = bam1_seqi( bam1_seq( b ), i ) ;
+            switch ( bit )
+            {
+                case 1: aln.seq[i] = 'A' ; break ;
+                case 2: aln.seq[i] = 'C' ; break ;
+                case 4: aln.seq[i] = 'G' ; break ;
+                case 8: aln.seq[i] = 'T' ; break ;
+                case 15: aln.seq[i] = 'N' ; break ;
+                default: aln.seq[i] = 'A' ; break ;
+            }	
+        }
+        aln.seq[i] = '\0' ;
+
+        /*if ( flag & 0x100 )
+            secondary = true ;
+        else 
+            secondary = false ;*/
+
 		samFlag = flag ;
-		for ( i = 0 ; col[5][i] ; ++i )
-			if ( col[5][i] == 'N' )
+		for ( i = 0 ; aln.cigar_string[i] ; ++i )
+			if ( aln.cigar_string[i] == 'N' )
 				break ;
 
-		if ( !col[5][i] )
+		if ( !aln.cigar_string[i] ) {
+            free_alignment(&aln) ;
 			continue ;
+        }
 		
 		// remove .1, .2 or /1, /2 suffix
 		if ( hasMateReadIdSuffix )
 		{
-			char *s = col[0] ;
+			char *s = aln.qname ;
 			int len = strlen( s ) ;
 			if ( len >= 2 && ( s[len - 1] == '1' || s[len - 1] == '2' ) 
 				&& ( s[len - 2] == '.' || s[len - 2] == '/' ) )
@@ -1037,60 +1046,32 @@ int main( int argc, char *argv[] )
 			}
 		}
 
-		if ( useSam )
-		{
-			if ( bam_aux_get( b, "XS" ) )
-			{
-				strand = bam_aux2A( bam_aux_get( b, "XS" ) ) ;
-				if ( bam_aux_get( b, "YS" ) )
-				{
-					noncanonStrandInfo = bam_aux2i( bam_aux_get( b, "YS" ) ) ;
-				}
-				else
-				{
-					noncanonStrandInfo = -1 ;
-				}
-			}
-			else if ( strandedLib != 0 ) 
-			{
-				strand = GetStrandFromStrandedLib(flag) ;
-				noncanonStrandInfo = -1 ;
-			}
-			else
-			{
-				strand = '?' ;
-				noncanonStrandInfo = -1 ;
-			}
-			startLocation = b->core.pos + 1 ;
-		}
-		else
-		{
-			if ( strstr( line, "XS:A:-" ) ) // on negative strand
-				strand = '-' ;
-			else if ( strstr( line, "XS:A:+" ) )
-				strand = '+' ;
-			else if ( strandedLib != 0) 
-			{
-				strand = GetStrandFromStrandedLib(flag) ;
-				noncanonStrandInfo = -1 ;
-			}
-			else
-			{
-				strand = '?' ;
-				char *p = strstr( line, "YS:i:" ) ;
-				if ( p != NULL )
-				{
-					p += 5 ;
-					noncanonStrandInfo = atoi( p ) ;
-				}
-				else
-					noncanonStrandInfo = -1 ;
-			}
-			startLocation = atoi( col[3] ) ;  
-		}
+        if ( bam_aux_get( b, "XS" ) )
+        {
+            strand = bam_aux2A( bam_aux_get( b, "XS" ) ) ;
+            if ( bam_aux_get( b, "YS" ) )
+            {
+                noncanonStrandInfo = bam_aux2i( bam_aux_get( b, "YS" ) ) ;
+            }
+            else
+            {
+                noncanonStrandInfo = -1 ;
+            }
+        }
+        else if ( strandedLib != 0 ) 
+        {
+            strand = GetStrandFromStrandedLib(flag) ;
+            noncanonStrandInfo = -1 ;
+        }
+        else
+        {
+            strand = '?' ;
+            noncanonStrandInfo = -1 ;
+        }
+        startLocation = b->core.pos + 1 ;
 		
 		// Found the junctions from the read.
-		if ( strcmp( prevChrome, col[2] ) )
+		if ( strcmp( prevChrome, aln.rname ) )
 		{
 			if ( flagPrintJunction )
 			{
@@ -1109,12 +1090,12 @@ int main( int argc, char *argv[] )
 			ClearReadTree( contradictedReads ) ;
 			contradictedReads = NULL ;
 			qHead = qTail = 0 ;
-			strcpy( prevChrome, col[2] ) ;
+			strcpy( prevChrome, aln.rname ) ;
 		}
 
 		if ( flagRemove )
 		{
-			if ( CompareJunctions( startLocation, col[5] ) )
+			if ( CompareJunctions( startLocation, aln.cigar_string ) )
 			{
 				// Test whether this read has new junctions
 				//++junctionCnt ;
@@ -1128,6 +1109,8 @@ int main( int argc, char *argv[] )
 			printf( "%s", line ) ;
 		}
 		//printf( "hi2 %s\n", col[0] ) ;
+
+        free_alignment(&aln);
 	}
 	
 	if ( flagPrintJunction )
@@ -1144,6 +1127,8 @@ int main( int argc, char *argv[] )
 	}	
 	
 	//fprintf( stderr, "The number of junctions: %d\n", junctionCnt ) ;
+    samclose(fpsam);
+    bam_destroy1(b);
 	return 0 ;
 }
 
