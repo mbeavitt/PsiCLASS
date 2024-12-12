@@ -526,13 +526,22 @@ bool CompareJunctions( int startLocation, char *cigar )
 	int num ;
 	int newJuncCnt = 0 ; // The # of junctions in the read, and the # of new junctions among them.
 	
-	//struct _cigarSeg cigarSeg[2000] ; // A segment of the cigar.
-    struct _cigarSeg* cigarSeg = (struct _cigarSeg*)malloc(2000 * sizeof(struct _cigarSeg));
 	int ccnt = 0 ; // cigarSeg cnt
+
+    // iterating through to get length
+    for (i = 0; cigar[i]; ++i) {
+        if (!(cigar[i] >= '0' && cigar[i] <= '9' )) {
+            ccnt++;
+        }        
+    }
+
+    struct _cigarSeg* cigarSeg = (struct _cigarSeg*) malloc(ccnt * sizeof(struct _cigarSeg));
 
 	j = 0 ;
 	num = 0 ;
 	validRead = true ;
+
+    ccnt = 0; // resetting to zero for copying over cigar
 
 	for ( i = 0 ; cigar[i] ; ++i )
 	{
