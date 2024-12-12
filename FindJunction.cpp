@@ -532,7 +532,7 @@ bool CompareJunctions( int startLocation, char *cigar )
     for (i = 0; cigar[i]; ++i) {
         if (!(cigar[i] >= '0' && cigar[i] <= '9' )) {
             ccnt++;
-        }        
+        }
     }
 
     struct _cigarSeg* cigarSeg = (struct _cigarSeg*) malloc(ccnt * sizeof(struct _cigarSeg));
