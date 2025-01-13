@@ -489,6 +489,10 @@ bool CompareJunctions( int startLocation, char *cigar )
 	int i, j ;
 	int num ;
 	int newJuncCnt = 0 ; // The # of junctions in the read, and the # of new junctions among them.
+
+    int n_chunks; // counter for cigar chunks in repetitiveness filter loop
+    float cumulative_repetitiveness; // a rolling count of repetitiveness calculations
+    float weighted_average_repetitiveness; // the final average repetitiveness across all chunks
 	
 	struct _cigarSeg cigarSeg[2000] ; // A segment of the cigar.
 	int ccnt = 0 ; // cigarSeg cnt
@@ -536,6 +540,8 @@ bool CompareJunctions( int startLocation, char *cigar )
 			int count[5] = { 0, 0, 0, 0, 0 } ;
 
 			int pos = 0 ;
+            n_chunks = 0;
+            cumulative_repetitiveness = 0.0;
 			for ( i = 0 ; i < ccnt ; ++i )
 			{
 				switch ( cigarSeg[i].type )
@@ -559,9 +565,10 @@ bool CompareJunctions( int startLocation, char *cigar )
 									max = count[j] ;
 								sum += count[j] ;
 							}
-							if ( max > 0.8 * sum ) {
-								validRead = false ;
-							}
+
+                            // cumulative repetitiveness, weighted by sum
+                            cumulative_repetitiveness += ((float) max / (float) sum) * (float) sum;
+                            n_chunks+= sum;
 							count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
 						} break ;
 					case 'H':
@@ -580,8 +587,26 @@ bool CompareJunctions( int startLocation, char *cigar )
 				}
 				sum += count[j] ;
 			}
-			if ( max > 0.8 * sum )
+            cumulative_repetitiveness += ((float) max / (float) sum) * (float) sum;
+            n_chunks+= sum;
+            weighted_average_repetitiveness = cumulative_repetitiveness / (float) n_chunks;
+
+            // filters reads where the non-softmasked chunks have an average repetitiveness
+            // of 0.8. If a read has one chunk, then 0.8 of that read's non-softmasked bases
+            // are the same base (e.g. "AAAAAAAATG"). This allows multiple split chunks of different
+            // repetitive regions to be evaluated, e.g. "AAAAAA|TTTTTT" will have a repetitiveness
+            // of 1.0 instead of 0.5 (| indicates a split, or 'N' in CIGAR)
+            if ( weighted_average_repetitiveness > 0.80 ) {
+                /*
+                 * Uncomment the following to show filtered reads...
+                fprintf(stderr, "!!!READ FILTERED!!!\n");
+                fprintf(stderr, "%s\n", cigar);
+                fprintf(stderr, "%s\n", col[9]);
+                fprintf(stderr, "Average repetitiveness: %.2f\n", weighted_average_repetitiveness);
+                fprintf(stderr, "\n");
+                */
 				validRead = false ;
+            }        
 			/*	count[0] = count[1] = count[2] = count[3] = count[4] = 0 ;
 
 
